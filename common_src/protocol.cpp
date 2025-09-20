@@ -43,7 +43,7 @@ std::string Protocol::get_username(Socket& socket) {
 }
 
 void Protocol::send_get_current_car(Socket& socket) {
-    uint8_t code = SEND_CURRENT_CAR;  // El cliente pide el auto actual
+    uint8_t code = SEND_CURRENT_CAR;
     socket.sendall(&code, sizeof(code));
 }
 
@@ -117,7 +117,7 @@ void Protocol::send_initial_money(Socket& socket, uint32_t money) {
 }
 
 void Protocol::send_current_car(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
-    uint8_t code = GET_CURRENT_CAR;  // El servidor envía el auto actual
+    uint8_t code = GET_CURRENT_CAR;
     
     socket.sendall(&code, sizeof(code));
     send_car_info(socket, name, year, price);
@@ -139,7 +139,6 @@ void Protocol::send_market_info(Socket& socket, const std::map<std::string, Car>
 void Protocol::send_car_info(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
     uint16_t name_length = to_big_endian_16(name.length());
     uint16_t year_be = to_big_endian_16(year);
-    // El precio se multiplica por 100 al enviarlo (según el enunciado)
     uint32_t price_be = to_big_endian_32(price * 100);
     
     socket.sendall(&name_length, sizeof(name_length));
@@ -165,7 +164,6 @@ Car Protocol::get_car_info(Socket& socket) {
     
     socket.recvall(&price_int, sizeof(price_int));
     price_int = from_big_endian_32(price_int);
-    // El precio se divide por 100 al recibirlo
     car.price = price_int / 100;
     
     return car;
@@ -204,4 +202,3 @@ Car Protocol::get_car_bought(Socket& socket, uint32_t& remaining_money) {
     
     return car;
 }
-
