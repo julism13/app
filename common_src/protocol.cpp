@@ -43,7 +43,7 @@ std::string Protocol::get_username(Socket& socket) {
 }
 
 void Protocol::send_get_current_car(Socket& socket) {
-    uint8_t code = GET_CURRENT_CAR;
+    uint8_t code = SEND_CURRENT_CAR;  // El cliente pide el auto actual
     socket.sendall(&code, sizeof(code));
 }
 
@@ -117,16 +117,10 @@ void Protocol::send_initial_money(Socket& socket, uint32_t money) {
 }
 
 void Protocol::send_current_car(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
-    uint8_t code = SEND_CURRENT_CAR;
-    uint16_t name_length = to_big_endian_16(name.length());
-    uint16_t year_be = to_big_endian_16(year);
-    uint32_t price_be = to_big_endian_32(price);
+    uint8_t code = GET_CURRENT_CAR;  // El servidor envía el auto actual
     
     socket.sendall(&code, sizeof(code));
-    socket.sendall(&name_length, sizeof(name_length));
-    socket.sendall(name.c_str(), name.length());
-    socket.sendall(&year_be, sizeof(year_be));
-    socket.sendall(&price_be, sizeof(price_be));
+    send_car_info(socket, name, year, price);
 }
 
 void Protocol::send_market_info(Socket& socket, const std::map<std::string, Car>& market) {
@@ -145,12 +139,51 @@ void Protocol::send_market_info(Socket& socket, const std::map<std::string, Car>
 void Protocol::send_car_info(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
     uint16_t name_length = to_big_endian_16(name.length());
     uint16_t year_be = to_big_endian_16(year);
-    uint32_t price_be = to_big_endian_32(price);
+    // El precio se multiplica por 100 al enviarlo (según el enunciado)
+    uint32_t price_be = to_big_endian_32(price * 100);
     
     socket.sendall(&name_length, sizeof(name_length));
     socket.sendall(name.c_str(), name.length());
     socket.sendall(&year_be, sizeof(year_be));
     socket.sendall(&price_be, sizeof(price_be));
+}
+
+Car Protocol::get_car_info(Socket& socket) {
+    Car car;
+    uint16_t name_length;
+    uint16_t year;
+    uint32_t price_int;
+    
+    socket.recvall(&name_length, sizeof(name_length));
+    name_length = from_big_endian_16(name_length);
+    
+    car.name.resize(name_length);
+    socket.recvall(&car.name[0], name_length);
+    
+    socket.recvall(&year, sizeof(year));
+    car.year = from_big_endian_16(year);
+    
+    socket.recvall(&price_int, sizeof(price_int));
+    price_int = from_big_endian_32(price_int);
+    // El precio se divide por 100 al recibirlo
+    car.price = price_int / 100;
+    
+    return car;
+}
+
+std::map<std::string, Car> Protocol::get_market_info(Socket& socket) {
+    std::map<std::string, Car> market;
+    uint16_t num_cars;
+    
+    socket.recvall(&num_cars, sizeof(num_cars));
+    num_cars = from_big_endian_16(num_cars);
+    
+    for (int i = 0; i < num_cars; i++) {
+        Car car = get_car_info(socket);
+        market[car.name] = car;
+    }
+    
+    return market;
 }
 
 void Protocol::send_car_bought(Socket& socket, const std::string& name, uint16_t year, uint32_t price, uint32_t remaining_money) {
@@ -161,3 +194,14 @@ void Protocol::send_car_bought(Socket& socket, const std::string& name, uint16_t
     send_car_info(socket, name, year, price);
     socket.sendall(&remaining_money_be, sizeof(remaining_money_be));
 }
+
+Car Protocol::get_car_bought(Socket& socket, uint32_t& remaining_money) {
+    Car car = get_car_info(socket);
+    uint32_t money;
+    
+    socket.recvall(&money, sizeof(money));
+    remaining_money = from_big_endian_32(money);
+    
+    return car;
+}
+
