@@ -7,11 +7,10 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-// Forward declaration
 struct Car {
     std::string name;
     uint16_t year;
-    uint32_t price;
+    uint32_t price;  // Precio en unidades enteras (no centavos)
 
     Car() : name(""), year(0), price(0) {}
 };
@@ -28,19 +27,23 @@ public:
     void send_car_bought(Socket& socket, const std::string& name, uint16_t year, uint32_t price,
                          uint32_t remaining_money);
     void send_error_message(Socket& socket, const std::string& message);
-    void send_car_info(Socket& socket, const std::string& name, uint16_t year, uint32_t price);
     
     std::string get_error_message(Socket& socket);
     std::string get_username(Socket& socket);
     std::string get_car_name(Socket& socket);
     uint32_t get_initial_money(Socket& socket);
     uint8_t get_command(Socket& socket);
+    Car get_car_info(Socket& socket);
+    std::map<std::string, Car> get_market_info(Socket& socket);
+    Car get_car_bought(Socket& socket, uint32_t& remaining_money);
 
 private:
     uint16_t to_big_endian_16(uint16_t value);
     uint32_t to_big_endian_32(uint32_t value);
     uint16_t from_big_endian_16(uint16_t value);
     uint32_t from_big_endian_32(uint32_t value);
+    void send_car_info(Socket& socket, const std::string& name, uint16_t year, uint32_t price);
 };
 
 #endif
+
