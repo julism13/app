@@ -13,7 +13,6 @@ void Client::leer_script(const std::string& filename) {
     std::string line;
 
     while (std::getline(file, line)) {
-        // Ignorar líneas vacías
         if (line.empty()) continue;
         
         Command cmd;
@@ -37,17 +36,16 @@ void Client::run(const std::string& hostname, const std::string& port) {
         Socket socket(hostname.c_str(), port.c_str());
         execute_commands(socket);
     } catch (const std::exception& e) {
-        // Conexión cerrada o error - terminar normalmente
+        // Error de conexión
         return;
     }
 }
 
 void Client::execute_commands(Socket& socket) {
-    for (const Command& cmd : commands) {
-        try {
+    try {
+        for (const Command& cmd : commands) {
             if (cmd.action == "username") {
                 protocol.send_username(socket, cmd.parameter);
-                
                 uint32_t money = protocol.get_initial_money(socket);
                 std::cout << "Initial balance: " << money << std::endl;
                 
@@ -63,19 +61,18 @@ void Client::execute_commands(Socket& socket) {
                 protocol.buy_car(socket, cmd.parameter);
                 handle_server_response(socket);
             }
-        } catch (const std::exception& e) {
-            // Error en comunicación - terminar
-            return;
         }
+    } catch (const std::exception& e) {
+        // Error de comunicación - terminar silenciosamente
+        return;
     }
-    // Todos los comandos procesados - cliente termina
 }
 
 void Client::handle_server_response(Socket& socket) {
     uint8_t response_code = protocol.get_command(socket);
     
     switch (response_code) {
-        case GET_CURRENT_CAR:  // El servidor envía el auto actual
+        case GET_CURRENT_CAR:
             handle_current_car_response(socket);
             break;
         case SEND_MARKET_INFO:
@@ -87,16 +84,13 @@ void Client::handle_server_response(Socket& socket) {
         case SEND_ERROR_MESSAGE:
             handle_error_response(socket);
             break;
-        default:
-            // Código desconocido - terminar
-            break;
     }
 }
 
 void Client::handle_current_car_response(Socket& socket) {
     Car car = protocol.get_car_info(socket);
     std::cout << "Current car: " << car.name << ", year: " << car.year 
-              << ", price: " << car.price << ".00" << std::endl;
+              << ", price: " << std::fixed << std::setprecision(2) << car.price << std::endl;
 }
 
 void Client::handle_market_response(Socket& socket) {
@@ -105,7 +99,7 @@ void Client::handle_market_response(Socket& socket) {
     for (const auto& pair : market) {
         const Car& car = pair.second;
         std::cout << car.name << ", year: " << car.year << ", price: " 
-                  << car.price << ".00" << std::endl;
+                  << std::fixed << std::setprecision(2) << car.price << std::endl;
     }
 }
 
@@ -114,7 +108,7 @@ void Client::handle_car_bought_response(Socket& socket) {
     Car car = protocol.get_car_bought(socket, remaining_money);
     
     std::cout << "Car bought: " << car.name << ", year: " << car.year 
-              << ", price: " << car.price << ".00" << std::endl;
+              << ", price: " << std::fixed << std::setprecision(2) << car.price << std::endl;
     std::cout << "Remaining balance: " << remaining_money << std::endl;
 }
 
