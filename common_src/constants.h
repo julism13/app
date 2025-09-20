@@ -14,3 +14,4 @@ const uint8_t SEND_CAR_BOUGHT = 0x08;
 const uint8_t SEND_ERROR_MESSAGE = 0x09;
 
 #endif
+
