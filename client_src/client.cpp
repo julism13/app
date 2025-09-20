@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <arpa/inet.h>
+#include <iomanip>
 
 #include "client.h"
 #include "../common_src/protocol.h"
@@ -13,6 +13,9 @@ void Client::leer_script(const std::string& filename) {
     std::string line;
 
     while (std::getline(file, line)) {
+        // Ignorar líneas vacías
+        if (line.empty()) continue;
+        
         Command cmd;
         std::istringstream iss(line);
         iss >> cmd.action;
@@ -30,38 +33,49 @@ void Client::leer_script(const std::string& filename) {
 }
 
 void Client::run(const std::string& hostname, const std::string& port) {
-    Socket socket(hostname.c_str(), port.c_str());
-    execute_commands(socket);
+    try {
+        Socket socket(hostname.c_str(), port.c_str());
+        execute_commands(socket);
+    } catch (const std::exception& e) {
+        // Conexión cerrada o error - terminar normalmente
+        return;
+    }
 }
 
 void Client::execute_commands(Socket& socket) {
     for (const Command& cmd : commands) {
-        if (cmd.action == "username") {
-            protocol.send_username(socket, cmd.parameter);
-            
-            uint32_t money = protocol.get_initial_money(socket);
-            std::cout << "Initial balance: " << money << std::endl;
-            
-        } else if (cmd.action == "get_current_car") {
-            protocol.send_get_current_car(socket);
-            handle_server_response(socket);
-            
-        } else if (cmd.action == "get_market") {
-            protocol.send_get_market_info(socket);
-            handle_server_response(socket);
-            
-        } else if (cmd.action == "buy_car") {
-            protocol.buy_car(socket, cmd.parameter);
-            handle_server_response(socket);
+        try {
+            if (cmd.action == "username") {
+                protocol.send_username(socket, cmd.parameter);
+                
+                uint32_t money = protocol.get_initial_money(socket);
+                std::cout << "Initial balance: " << money << std::endl;
+                
+            } else if (cmd.action == "get_current_car") {
+                protocol.send_get_current_car(socket);
+                handle_server_response(socket);
+                
+            } else if (cmd.action == "get_market") {
+                protocol.send_get_market_info(socket);
+                handle_server_response(socket);
+                
+            } else if (cmd.action == "buy_car") {
+                protocol.buy_car(socket, cmd.parameter);
+                handle_server_response(socket);
+            }
+        } catch (const std::exception& e) {
+            // Error en comunicación - terminar
+            return;
         }
     }
+    // Todos los comandos procesados - cliente termina
 }
 
 void Client::handle_server_response(Socket& socket) {
     uint8_t response_code = protocol.get_command(socket);
     
     switch (response_code) {
-        case SEND_CURRENT_CAR:
+        case GET_CURRENT_CAR:  // El servidor envía el auto actual
             handle_current_car_response(socket);
             break;
         case SEND_MARKET_INFO:
@@ -74,82 +88,33 @@ void Client::handle_server_response(Socket& socket) {
             handle_error_response(socket);
             break;
         default:
-            std::cout << "Unknown response code: " << (int)response_code << std::endl;
+            // Código desconocido - terminar
             break;
     }
 }
 
 void Client::handle_current_car_response(Socket& socket) {
-    // Recibir info del auto
-    uint16_t name_length;
-    socket.recvall(&name_length, sizeof(name_length));
-    name_length = ntohs(name_length);
-    
-    std::string name(name_length, '\0');
-    socket.recvall(&name[0], name_length);
-    
-    uint16_t year;
-    socket.recvall(&year, sizeof(year));
-    year = ntohs(year);
-    
-    uint32_t price;
-    socket.recvall(&price, sizeof(price));
-    price = ntohl(price);
-    
-    std::cout << "Current car: " << name << ", year: " << year 
-              << ", price: " << (price / 100.0) << std::endl;
+    Car car = protocol.get_car_info(socket);
+    std::cout << "Current car: " << car.name << ", year: " << car.year 
+              << ", price: " << car.price << ".00" << std::endl;
 }
 
 void Client::handle_market_response(Socket& socket) {
-    uint16_t num_cars;
-    socket.recvall(&num_cars, sizeof(num_cars));
-    num_cars = ntohs(num_cars);
+    std::map<std::string, Car> market = protocol.get_market_info(socket);
     
-    for (int i = 0; i < num_cars; i++) {
-        // Recibir info de cada auto
-        uint16_t name_length;
-        socket.recvall(&name_length, sizeof(name_length));
-        name_length = ntohs(name_length);
-        
-        std::string name(name_length, '\0');
-        socket.recvall(&name[0], name_length);
-        
-        uint16_t year;
-        socket.recvall(&year, sizeof(year));
-        year = ntohs(year);
-        
-        uint32_t price;
-        socket.recvall(&price, sizeof(price));
-        price = ntohl(price);
-        
-        std::cout << name << ", year: " << year << ", price: " 
-                  << (price / 100.0) << std::endl;
+    for (const auto& pair : market) {
+        const Car& car = pair.second;
+        std::cout << car.name << ", year: " << car.year << ", price: " 
+                  << car.price << ".00" << std::endl;
     }
 }
 
 void Client::handle_car_bought_response(Socket& socket) {
-    // Recibir info del auto comprado
-    uint16_t name_length;
-    socket.recvall(&name_length, sizeof(name_length));
-    name_length = ntohs(name_length);
-    
-    std::string name(name_length, '\0');
-    socket.recvall(&name[0], name_length);
-    
-    uint16_t year;
-    socket.recvall(&year, sizeof(year));
-    year = ntohs(year);
-    
-    uint32_t price;
-    socket.recvall(&price, sizeof(price));
-    price = ntohl(price);
-    
     uint32_t remaining_money;
-    socket.recvall(&remaining_money, sizeof(remaining_money));
-    remaining_money = ntohl(remaining_money);
+    Car car = protocol.get_car_bought(socket, remaining_money);
     
-    std::cout << "Car bought: " << name << ", year: " << year 
-              << ", price: " << (price / 100.0) << std::endl;
+    std::cout << "Car bought: " << car.name << ", year: " << car.year 
+              << ", price: " << car.price << ".00" << std::endl;
     std::cout << "Remaining balance: " << remaining_money << std::endl;
 }
 
