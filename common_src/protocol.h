@@ -10,9 +10,9 @@
 struct Car {
     std::string name;
     uint16_t year;
-    uint32_t price;  // Precio en unidades enteras (no centavos)
+    float price;  // Cambiar a float según enunciado
 
-    Car() : name(""), year(0), price(0) {}
+    Car() : name(""), year(0), price(0.0f) {}
 };
 
 class Protocol {
@@ -46,4 +46,3 @@ private:
 };
 
 #endif
-
