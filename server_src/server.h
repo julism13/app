@@ -1,5 +1,7 @@
 #include <map>
 #include <string>
+#include <vector>
+#include <algorithm>
 
 #include "../common_src/protocol.h"
 #include "../common_src/socket.h"
@@ -10,6 +12,7 @@
 class Server {
 private:
     std::map<std::string, Car> market;
+    std::vector<Car> market_order;  // Para mantener orden de inserción
     Protocol protocol;
     Car player_car;
     uint32_t initial_money;
@@ -24,7 +27,7 @@ public:
     void handle_client(Socket& client);
     void handle_get_current_car(Socket& client);
     void handle_get_market(Socket& client);
-    void handle_buy_car(Socket& client);
+    bool handle_buy_car(Socket& client);
 };
 
 #endif
