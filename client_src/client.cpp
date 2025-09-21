@@ -10,8 +10,11 @@
 
 void Client::leer_script(const std::string& filename) {
     std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open client script file");
+    }
+    
     std::string line;
-
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         
@@ -29,12 +32,19 @@ void Client::leer_script(const std::string& filename) {
 
         commands.push_back(cmd);
     }
+    
+    // Debug: mostrar comandos leídos
+    std::cerr << "[DEBUG CLIENT] Comandos leídos: " << commands.size() << std::endl;
+    for (size_t i = 0; i < commands.size(); i++) {
+        std::cerr << "[DEBUG CLIENT] " << i << ": " << commands[i].action << " '" << commands[i].parameter << "'" << std::endl;
+    }
 }
 
 void Client::run(const std::string& hostname, const std::string& port) {
     try {
         Socket socket(hostname.c_str(), port.c_str());
         execute_commands(socket);
+        // El socket se cerrará automáticamente cuando salga del scope
     } catch (const std::exception& e) {
         // Error de conexión
         return;
@@ -43,7 +53,10 @@ void Client::run(const std::string& hostname, const std::string& port) {
 
 void Client::execute_commands(Socket& socket) {
     try {
-        for (const Command& cmd : commands) {
+        for (size_t i = 0; i < commands.size(); i++) {
+            const Command& cmd = commands[i];
+            std::cerr << "[DEBUG CLIENT] Ejecutando comando " << i << ": " << cmd.action << " " << cmd.parameter << std::endl;
+            
             if (cmd.action == "username") {
                 protocol.send_username(socket, cmd.parameter);
                 uint32_t money = protocol.get_initial_money(socket);
@@ -58,11 +71,16 @@ void Client::execute_commands(Socket& socket) {
                 handle_server_response(socket);
                 
             } else if (cmd.action == "buy_car") {
+                std::cerr << "[DEBUG CLIENT] Enviando buy_car para: " << cmd.parameter << std::endl;
                 protocol.buy_car(socket, cmd.parameter);
                 handle_server_response(socket);
             }
+            
+            std::cerr << "[DEBUG CLIENT] Comando completado: " << cmd.action << std::endl;
         }
+        std::cerr << "[DEBUG CLIENT] Todos los comandos completados, terminando" << std::endl;
     } catch (const std::exception& e) {
+        std::cerr << "[DEBUG CLIENT] Excepción: " << e.what() << std::endl;
         // Error de comunicación - terminar silenciosamente
         return;
     }
@@ -72,16 +90,16 @@ void Client::handle_server_response(Socket& socket) {
     uint8_t response_code = protocol.get_command(socket);
     
     switch (response_code) {
-        case GET_CURRENT_CAR:
+        case SEND_CURRENT_CAR:  // 0x04 - servidor ENVÍA auto actual
             handle_current_car_response(socket);
             break;
-        case SEND_MARKET_INFO:
+        case SEND_MARKET_INFO:  // 0x06
             handle_market_response(socket);
             break;
-        case SEND_CAR_BOUGHT:
+        case SEND_CAR_BOUGHT:   // 0x08
             handle_car_bought_response(socket);
             break;
-        case SEND_ERROR_MESSAGE:
+        case SEND_ERROR_MESSAGE: // 0x09
             handle_error_response(socket);
             break;
     }
