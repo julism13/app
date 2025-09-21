@@ -1,5 +1,7 @@
 #include <iostream>
 #include <arpa/inet.h>
+#include <vector>
+#include <algorithm>
 #include "constants.h"
 #include "protocol.h"
 #include "socket.h"
@@ -30,20 +32,31 @@ void Protocol::send_username(Socket& socket, const std::string& username) {
 }
 
 std::string Protocol::get_username(Socket& socket) {
-    uint8_t code;
     uint16_t length;
 
-    socket.recvall(&code, sizeof(code));
-    socket.recvall(&length, sizeof(length));
+    int bytes_read = socket.recvall(&length, sizeof(length));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during username length read");
+    }
+    
     length = from_big_endian_16(length);
+    
+    // Sanity check
+    if (length > 100) {
+        throw std::runtime_error("Username too long");
+    }
+    
     std::string username(length, '\0');
-    socket.recvall(&username[0], length);
+    bytes_read = socket.recvall(&username[0], length);
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during username read");
+    }
 
     return username;
 }
 
 void Protocol::send_get_current_car(Socket& socket) {
-    uint8_t code = SEND_CURRENT_CAR;
+    uint8_t code = GET_CURRENT_CAR;  // Cambio: era SEND_CURRENT_CAR
     socket.sendall(&code, sizeof(code));
 }
 
@@ -56,8 +69,15 @@ uint32_t Protocol::get_initial_money(Socket& socket) {
     uint8_t code;
     uint32_t money;
     
-    socket.recvall(&code, sizeof(code));
-    socket.recvall(&money, sizeof(money));
+    int bytes_read = socket.recvall(&code, sizeof(code));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during money code read");
+    }
+    
+    bytes_read = socket.recvall(&money, sizeof(money));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during money read");
+    }
     
     return from_big_endian_32(money);
 }
@@ -84,7 +104,10 @@ std::string Protocol::get_error_message(Socket& socket) {
 
 uint8_t Protocol::get_command(Socket& socket) {
     uint8_t code;
-    socket.recvall(&code, sizeof(code));
+    int bytes_read = socket.recvall(&code, sizeof(code));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed");
+    }
     return code;
 }
 
@@ -100,10 +123,21 @@ void Protocol::buy_car(Socket& socket, const std::string& car_name) {
 std::string Protocol::get_car_name(Socket& socket) {
     uint16_t length;
     
-    socket.recvall(&length, sizeof(length));
+    int bytes_read = socket.recvall(&length, sizeof(length));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car name length read");
+    }
+    
     length = from_big_endian_16(length);
+    if (length > 100) {  // Sanity check
+        throw std::runtime_error("Invalid car name length");
+    }
+    
     std::string car_name(length, '\0');
-    socket.recvall(&car_name[0], length);
+    bytes_read = socket.recvall(&car_name[0], length);
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car name read");
+    }
     
     return car_name;
 }
@@ -117,7 +151,7 @@ void Protocol::send_initial_money(Socket& socket, uint32_t money) {
 }
 
 void Protocol::send_current_car(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
-    uint8_t code = GET_CURRENT_CAR;
+    uint8_t code = SEND_CURRENT_CAR;  // Debe ser 0x04 (servidor ENVÍA)
     
     socket.sendall(&code, sizeof(code));
     send_car_info(socket, name, year, price);
@@ -130,8 +164,9 @@ void Protocol::send_market_info(Socket& socket, const std::map<std::string, Car>
     socket.sendall(&code, sizeof(code));
     socket.sendall(&num_cars, sizeof(num_cars));
     
-    for (const auto& pair : market) {
-        const Car& car = pair.second;
+    // Usar el orden que viene en el map (que ahora será el orden correcto del servidor)
+    for (auto it = market.begin(); it != market.end(); ++it) {
+        const Car& car = it->second;
         send_car_info(socket, car.name, car.year, car.price);
     }
 }
@@ -139,7 +174,7 @@ void Protocol::send_market_info(Socket& socket, const std::map<std::string, Car>
 void Protocol::send_car_info(Socket& socket, const std::string& name, uint16_t year, uint32_t price) {
     uint16_t name_length = to_big_endian_16(name.length());
     uint16_t year_be = to_big_endian_16(year);
-    uint32_t price_be = to_big_endian_32(price * 100);
+    uint32_t price_be = to_big_endian_32(price * 100);  // Multiplicar por 100 para centavos
     
     socket.sendall(&name_length, sizeof(name_length));
     socket.sendall(name.c_str(), name.length());
@@ -153,18 +188,36 @@ Car Protocol::get_car_info(Socket& socket) {
     uint16_t year;
     uint32_t price_int;
     
-    socket.recvall(&name_length, sizeof(name_length));
+    int bytes_read = socket.recvall(&name_length, sizeof(name_length));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car name length read");
+    }
+    
     name_length = from_big_endian_16(name_length);
     
-    car.name.resize(name_length);
-    socket.recvall(&car.name[0], name_length);
+    // Sanity check
+    if (name_length > 100) {
+        throw std::runtime_error("Car name too long");
+    }
     
-    socket.recvall(&year, sizeof(year));
+    car.name.resize(name_length);
+    bytes_read = socket.recvall(&car.name[0], name_length);
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car name read");
+    }
+    
+    bytes_read = socket.recvall(&year, sizeof(year));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car year read");
+    }
     car.year = from_big_endian_16(year);
     
-    socket.recvall(&price_int, sizeof(price_int));
+    bytes_read = socket.recvall(&price_int, sizeof(price_int));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during car price read");
+    }
     price_int = from_big_endian_32(price_int);
-    car.price = price_int / 100;
+    car.price = price_int / 100;  // Dividir por 100 para obtener el precio original
     
     return car;
 }
@@ -173,10 +226,19 @@ std::map<std::string, Car> Protocol::get_market_info(Socket& socket) {
     std::map<std::string, Car> market;
     uint16_t num_cars;
     
-    socket.recvall(&num_cars, sizeof(num_cars));
+    int bytes_read = socket.recvall(&num_cars, sizeof(num_cars));
+    if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed during market size read");
+    }
+    
     num_cars = from_big_endian_16(num_cars);
     
-    for (int i = 0; i < num_cars; i++) {
+    // Sanity check para evitar bucles infinitos
+    if (num_cars > 100) {
+        throw std::runtime_error("Too many cars in market");
+    }
+    
+    for (uint16_t i = 0; i < num_cars; i++) {
         Car car = get_car_info(socket);
         market[car.name] = car;
     }
