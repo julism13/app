@@ -41,7 +41,6 @@ std::string Protocol::get_username(Socket& socket) {
     
     length = from_big_endian_16(length);
     
-    // Sanity check
     if (length > 100) {
         throw std::runtime_error("Username too long");
     }
@@ -56,7 +55,7 @@ std::string Protocol::get_username(Socket& socket) {
 }
 
 void Protocol::send_get_current_car(Socket& socket) {
-    uint8_t code = GET_CURRENT_CAR;  // Debe ser 0x03 (cliente PIDE)
+    uint8_t code = GET_CURRENT_CAR;
     socket.sendall(&code, sizeof(code));
 }
 
@@ -164,11 +163,7 @@ void Protocol::send_market_info(Socket& socket, const std::vector<Car>& market_o
     socket.sendall(&code, sizeof(code));
     socket.sendall(&num_cars, sizeof(num_cars));
     
-    // DEBUG: Mostrar qué se está enviando
-    std::cerr << "[DEBUG PROTOCOL] Enviando " << market_order.size() << " autos:" << std::endl;
-    
     for (const Car& car : market_order) {
-        std::cerr << "[DEBUG PROTOCOL] Enviando: " << car.name << std::endl;
         send_car_info(socket, car.name, car.year, car.price);
     }
 }
@@ -224,7 +219,7 @@ Car Protocol::get_car_info(Socket& socket) {
 }
 
 std::vector<Car> Protocol::get_market_info(Socket& socket) {
-    std::vector<Car> market;  // Cambiar de map a vector
+    std::vector<Car> market; 
     uint16_t num_cars;
     
     int bytes_read = socket.recvall(&num_cars, sizeof(num_cars));
@@ -239,7 +234,7 @@ std::vector<Car> Protocol::get_market_info(Socket& socket) {
     
     for (uint16_t i = 0; i < num_cars; i++) {
         Car car = get_car_info(socket);
-        market.push_back(car);  // Cambiar de market[car.name] = car a push_back
+        market.push_back(car);
     }
     
     return market;
