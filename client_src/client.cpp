@@ -96,13 +96,14 @@ void Client::handle_current_car_response(Socket& socket) {
 }
 
 void Client::handle_market_response(Socket& socket) {
-    std::vector<Car> market = protocol.get_market_info(socket);  // Cambiar de a vector
+    std::vector<Car> market = protocol.get_market_info(socket);
     
     for (const Car& car : market) {
         std::cout << car.name << ", year: " << car.year << ", price: " 
                   << std::fixed << std::setprecision(2) << car.price << std::endl;
     }
 }
+
 
 void Client::handle_car_bought_response(Socket& socket) {
     uint32_t remaining_money;
