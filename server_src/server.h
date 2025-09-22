@@ -20,7 +20,10 @@ private:
     bool player_has_car;
 
 public:
-    Server() : initial_money(0), player_money(0), player_has_car(false) {}
+    Server() : initial_money(0), player_money(0), player_has_car(false) {
+        // Inicializar el orden esperado del mercado
+        market_order.reserve(10);
+    }
 
     void leer_config(const std::string& filename);
     void run(const std::string& port);
