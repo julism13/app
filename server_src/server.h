@@ -12,7 +12,7 @@
 class Server {
 private:
     std::map<std::string, Car> market;
-    std::vector<Car> market_order;  // Para mantener orden de inserción
+    std::vector<Car> market_order;
     Protocol protocol;
     Car player_car;
     uint32_t initial_money;
@@ -21,7 +21,6 @@ private:
 
 public:
     Server() : initial_money(0), player_money(0), player_has_car(false) {
-        // Inicializar el orden esperado del mercado
         market_order.reserve(10);
     }
 
