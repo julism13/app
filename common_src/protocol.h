@@ -10,7 +10,7 @@
 struct Car {
     std::string name;
     uint16_t year;
-    float price;  // Cambiar a float según enunciado
+    float price;
 
     Car() : name(""), year(0), price(0.0f) {}
 };
@@ -22,11 +22,11 @@ public:
     void send_get_current_car(Socket& socket);
     void send_current_car(Socket& socket, const std::string& name, uint16_t year, uint32_t price);
     void send_get_market_info(Socket& socket);
-    void send_market_info(Socket& socket, const std::map<std::string, Car>& market);
     void buy_car(Socket& socket, const std::string& car_name);
     void send_car_bought(Socket& socket, const std::string& name, uint16_t year, uint32_t price,
                          uint32_t remaining_money);
     void send_error_message(Socket& socket, const std::string& message);
+    void send_market_info(Socket& socket, const std::vector<Car>& market_order);
     
     std::string get_error_message(Socket& socket);
     std::string get_username(Socket& socket);
@@ -34,7 +34,7 @@ public:
     uint32_t get_initial_money(Socket& socket);
     uint8_t get_command(Socket& socket);
     Car get_car_info(Socket& socket);
-    std::map<std::string, Car> get_market_info(Socket& socket);
+    std::vector<Car> get_market_info(Socket& socket); 
     Car get_car_bought(Socket& socket, uint32_t& remaining_money);
 
 private:
