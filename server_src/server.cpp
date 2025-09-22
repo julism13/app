@@ -20,16 +20,7 @@ void Server::leer_config(const std::string& filename) {
             file >> car.name >> car.year >> car.price;
             market[car.name] = car;
             market_order.push_back(car);
-            
-            // DEBUG: Imprimir el orden de inserción
-            std::cerr << "[DEBUG] Auto agregado: " << car.name << std::endl;
         }
-    }
-    
-    // DEBUG: Mostrar el orden final en market_order
-    std::cerr << "[DEBUG] Orden en market_order:" << std::endl;
-    for (size_t i = 0; i < market_order.size(); i++) {
-        std::cerr << "[DEBUG] " << i << ": " << market_order[i].name << std::endl;
     }
 }
 
@@ -42,60 +33,57 @@ void Server::run(const std::string& port) {
 }
 
 void Server::handle_client(Socket& client) {
-    try {
-        uint8_t command_code;
-        int bytes_read = client.recvsome(&command_code, sizeof(command_code));
-        if (bytes_read == 0) {
-            return;
-        }
-        
-        if (command_code != SEND_USERNAME) {
-            return;
-        }
-        
-        uint16_t length;
-        bytes_read = client.recvall(&length, sizeof(length));
-        if (bytes_read == 0) return;
-        
-        length = ntohs(length);
-        if (length > 100) return;
-        
-        std::string username(length, '\0');
-        bytes_read = client.recvall(&username[0], length);
-        if (bytes_read == 0) return;
-        
-        std::cout << "Hello, " << username << std::endl;
-        
-        protocol.send_initial_money(client, initial_money);
-        std::cout << "Initial balance: " << initial_money << std::endl;
-        
-        while (true) {
-            uint8_t command;
-            
-            int bytes_received = client.recvsome(&command, sizeof(command));
-            if (bytes_received == 0) {
-                break;
-            }
-            
-            switch (command) {
-                case GET_CURRENT_CAR: 
-                    handle_get_current_car(client);
-                    break;
-                case GET_MARKET_INFO:  // 0x05  
-                    handle_get_market(client);
-                    break;
-                case BUY_CAR:  // 0x07
-                    if (!handle_buy_car(client)) {
-                        return;
-                    }
-                    break;
-                default:
-                    return;
-            }
-        }
-    } catch (const std::exception& e) {
-        // Error de comunicación, terminar silenciosamente
+    uint8_t command_code;
+    int bytes_read = client.recvsome(&command_code, sizeof(command_code));
+    if (bytes_read == 0) {
+        return;
     }
+        
+    if (command_code != SEND_USERNAME) {
+        return;
+    }
+        
+    uint16_t length;
+    bytes_read = client.recvall(&length, sizeof(length));
+    if (bytes_read == 0) return;
+    
+    length = ntohs(length);
+    if (length > 100) return;
+        
+    std::string username(length, '\0');
+    bytes_read = client.recvall(&username[0], length);
+    if (bytes_read == 0) return;
+        
+    std::cout << "Hello, " << username << std::endl;
+        
+    protocol.send_initial_money(client, initial_money);
+    std::cout << "Initial balance: " << initial_money << std::endl;
+        
+    while (true) {
+        uint8_t command;
+            
+        int bytes_received = client.recvsome(&command, sizeof(command));
+        if (bytes_received == 0) {
+            break;
+        }
+            
+        switch (command) {
+            case GET_CURRENT_CAR: 
+                handle_get_current_car(client);
+                break;
+            case GET_MARKET_INFO:
+                handle_get_market(client);
+                break;
+            case BUY_CAR:
+                if (!handle_buy_car(client)) {
+                    return;
+                }
+                break;
+            default:
+                return;
+        }
+    }
+    
 }
 
 void Server::handle_get_current_car(Socket& client) {
